@@ -137,26 +137,24 @@ router.post("/user/leave", (req, res) => {
     console.log(err);
   });
 
-  Game.findOne(
-    { _id: req.body.game_id }, 
-    function (err, game) {
+  Game.findOne({ _id: req.body.game_id })
+    .then((game) => {
+      if (!game) return null;
       game.guesser = (game.guesser && game.guesser._id == req.body._id) ? null : game.guesser;
-      game.save(function (err) {
-          if(err) {
-              console.error('ERROR!');
-          }
-      });
-    }
-  ).then((res) => {
-    socketManager.getIo().emit("players_and_game_id", 
-          {
-            players: res.players, 
-            game_id: res._id,
-          });
-  }).catch((err) => {
-    console.log("Error with user/leave");
-    console.log(err);
-  });
+      return game.save();
+    })
+    .then((saved) => {
+      if (!saved) return;
+      socketManager.getIo().emit("players_and_game_id",
+            {
+              players: saved.players,
+              game_id: saved._id,
+            });
+    })
+    .catch((err) => {
+      console.log("Error with user/leave");
+      console.log(err);
+    });
 });
 
 router.post("/game/endTurn", (req, res) => {
@@ -437,9 +435,8 @@ router.get("/game/canvas", (req, res) => {
 });
 
 router.post("/game/join", (req, res) => {
-  Game.findOne(
-    {_id: req.body.game_id}, 
-    function (err, game) {
+  Game.findOne({ _id: req.body.game_id })
+    .then((game) => {
       // if player not already in game
       if (game && game.players) {
         let playerNotInGameYet = true;
@@ -461,17 +458,17 @@ router.post("/game/join", (req, res) => {
           }]);
         }
       
-        game.save().then((res) => {
+        return game.save().then((saved) => {
           socketManager.getIo().emit("players_and_game_id", 
           {
-            players: res.players, 
-            game_id: res._id
+            players: saved.players, 
+            game_id: saved._id
           });
 
-        }).catch((err) => {console.log(err)});
+        });
       }
-    },
-    ).then(()=>{res.send({status:"success"})})
+    })
+    .then(()=>{res.send({status:"success"})})
   .catch((err) => {
     console.log(err);
   });
@@ -495,9 +492,8 @@ router.put("/game/guess", (req, res) => {
     if (noGamesFound || emptyGuess || invalidUser ) {
       res.status(400).send({ msg: "you are not allowed to guess here" });
     }
-    Game.findOne(
-      {_id: req.body.game_id},
-      function (err, game) {
+    return Game.findOne({ _id: req.body.game_id })
+      .then((game) => {
         let invalidGame = !game || !game.guesses;
         if (invalidGame) {
           return res.status(404).res.send({message: "invalid game"});
@@ -509,7 +505,7 @@ router.put("/game/guess", (req, res) => {
           game.word_statuses.push("correct");
         }
 
-        game.save().then((updatedGame) => {
+        return game.save().then((updatedGame) => {
           if (correct) {
             res.send({message: "correct"});
             socketManager.getIo().emit("correct_guess", {
@@ -526,8 +522,6 @@ router.put("/game/guess", (req, res) => {
             game_id: updatedGame._id
           });
         });
-          
-
       });
   }).catch((err) => {
     console.log(err);
@@ -559,9 +553,8 @@ router.post("/game/changedDifficulty", (req, res)=> {
 });
 
 router.put("/game/start", (req, res) => {
-  Game.findOne(
-    {_id: req.body.game_id},
-    function(err, game) {
+  Game.findOne({ _id: req.body.game_id })
+    .then((game) => {
       game.guesser = game.players[0];
       game.pixelers = game.players.slice(1,game.players.length);
       game.started = true;
@@ -579,20 +572,22 @@ router.put("/game/start", (req, res) => {
         })
       }
 
-      game.save()
+      return game.save()
       .then((updatedGame) => {
         socketManager.getIo().emit("game_id_started", req.body.game_id);
         res.send({status: "success"});
-      }).catch((err) => {
-        console.log(err);
-        res.send({status: `error: ${err}`});
       });
+    }).catch((err) => {
+      console.log(err);
+      if (!res.headersSent) {
+        res.send({status: `error: ${err}`});
+      }
     });
 });
 
 router.put("/game/pixel", (req, res) => {
-  Game.findOne({_id: req.body.game_id},
-    function(err, game) {
+  Game.findOne({_id: req.body.game_id})
+    .then((game) => {
       let ok = false;
       for (let i = 0; i < game.num_filled.length; i++) {
         if (game.num_filled[i]._id == req.body._id) {
@@ -611,7 +606,7 @@ router.put("/game/pixel", (req, res) => {
         return;
       } else {
         game = Logic.updatePixel(game, req.body.pixel_id, req.body.pixel_color, req.body.pixel_filled);
-        game.save().then((updatedGame) => {
+        return game.save().then((updatedGame) => {
           socketManager.getIo().emit("board_and_game_id", 
           {
             pixel_id: req.body.pixel_id,
@@ -622,18 +617,18 @@ router.put("/game/pixel", (req, res) => {
           });
           let game = Logic.getReturnableGame(updatedGame, req.body._id);
           res.send(game);
-        }).catch((err) => {
-          console.log(err);
-        })
+        });
       }
-    }
-  );
+    })
+    .catch((err) => {
+      console.log(err);
+    });
 });
       
 router.post("/board/clear_pixels", (req, res) => {
   console.log(req.body);
-  Game.findOne({_id: req.body.game_id},
-    function(err, game) {
+  Game.findOne({_id: req.body.game_id})
+    .then((game) => {
       if (!game || !game.board) {
         res.status(400).send({ msg: "game not found" });
         return;
@@ -652,25 +647,19 @@ router.post("/board/clear_pixels", (req, res) => {
         game.board.pixels[i].color = "none";
         game.board.pixels[i].filled = false;
       }
-      game.save().then((res) => {
+      return game.save().then((saved) => {
         socketManager.getIo().emit("cleared_canvas", 
           {
-            board: res.board, 
-            pixels: res.board.pixels, 
-            _id: res._id, 
+            board: saved.board, 
+            pixels: saved.board.pixels, 
+            _id: saved._id, 
           });
+        res.send({board: saved.board});
       });
-    }
-  ).then((updatedGame) => {
-    socketManager.getIo().emit("cleared_canvas", 
-    {
-      board: updatedGame.board, 
-      _id: updatedGame._id, 
+    })
+    .catch((err) => {
+      console.log(err);
     });
-    res.send({board: updatedGame.board});
-  }).catch((err) => {
-    console.log(err);
-  });
 })
 
 // anything else falls to this "not found" case

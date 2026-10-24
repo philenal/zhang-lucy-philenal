@@ -13,6 +13,10 @@
 | - Actually starts the webserver
 */
 
+// Load .env before anything reads MONGO_SRV / SESSION_SECRET / GOOGLE_CLIENT_ID.
+// Does not override variables that are already set (Render, shell, tests).
+require("dotenv").config();
+
 // validator runs some basic checks to make sure you've set everything up correctly
 // this is a tool provided by staff, so you don't need to worry about it
 const validator = require("./validator");
@@ -25,7 +29,6 @@ const session = require("express-session"); // library that stores info about ea
 const mongoose = require("mongoose"); // library to connect to MongoDB
 const path = require("path"); // provide utilities for working with file and directory paths
 
-require("dotenv").config();
 const api = require("./api");
 const auth = require("./auth");
 
@@ -37,10 +40,10 @@ const mongoConnectionURL = process.env.MONGO_SRV;
 const databaseName = "pixonary";
 
 // connect to mongodb
+// Mongoose 6+ always uses the unified topology / new URL parser, and throws
+// if useNewUrlParser or useUnifiedTopology are passed.
 mongoose
   .connect(mongoConnectionURL, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
     dbName: databaseName,
   })
   .then(() => console.log("Connected to MongoDB"))
