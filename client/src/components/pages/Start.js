@@ -9,7 +9,8 @@ import ToggleButton from '../modules/ToggleButton';
 import "./Start.css";
 import "../../utilities.css";
 
-const GOOGLE_CLIENT_ID = "556090196938-aq68ifs953on2phsnv7kl6nc59t5h0gf.apps.googleusercontent.com";
+// Inlined at build time by webpack DefinePlugin. See shared/googleClientId.js.
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 /**
  * Start is the main page after the user logs in. Contains the StartMenu component
  * 
